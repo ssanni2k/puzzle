@@ -3,6 +3,7 @@ import type { PuzzleStatus } from './schemas/puzzle.js';
 export type { RegisterInput, LoginInput, ChangePasswordInput } from './schemas/auth.js';
 export type { CreatePuzzleInput, UpdatePuzzleInput, PuzzleQueryInput, PuzzleStatus } from './schemas/puzzle.js';
 export type { SaveProgressInput } from './schemas/progress.js';
+export type { PuzzleContours } from './schemas/contours.js';
 
 export { registerSchema, loginSchema, changePasswordSchema } from './schemas/auth.js';
 export { createPuzzleSchema, updatePuzzleSchema, puzzleQuerySchema, puzzleStatusEnum } from './schemas/puzzle.js';
@@ -47,6 +48,8 @@ export interface PieceData {
   targetY: number;
   offsetX: number;
   offsetY: number;
+  width: number;
+  height: number;
   top: 'tab' | 'blank' | 'flat';
   right: 'tab' | 'blank' | 'flat';
   bottom: 'tab' | 'blank' | 'flat';
