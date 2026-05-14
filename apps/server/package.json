@@ -1,0 +1,36 @@
+{
+  "name": "@puzzle-app/server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11",
+    "@fastify/cors": "^10",
+    "@fastify/multipart": "^9",
+    "@fastify/websocket": "^11",
+    "@puzzle-app/shared": "workspace:*",
+    "@sinclair/typebox": "^0.34",
+    "bcryptjs": "^2",
+    "bullmq": "^5",
+    "drizzle-orm": "^0.38",
+    "fastify": "^5",
+    "ioredis": "^5",
+    "pg": "^8",
+    "uuid": "^11"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2",
+    "@types/pg": "^8",
+    "@types/uuid": "^10",
+    "drizzle-kit": "^0.30",
+    "tsx": "^4",
+    "typescript": "^5"
+  }
+}
