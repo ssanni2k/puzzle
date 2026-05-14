@@ -4,6 +4,7 @@ import cookie from '@fastify/cookie';
 import websocket from '@fastify/websocket';
 import { db } from './db/index.js';
 import { registerRoutes } from './routes/index.js';
+import { authPlugin } from './plugins/auth.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '0.0.0.0';
@@ -18,6 +19,8 @@ async function main() {
 
   await app.register(cookie);
   await app.register(websocket);
+
+  await app.register(authPlugin);
 
   app.decorate('db', db);
 
