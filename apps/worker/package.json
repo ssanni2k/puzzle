@@ -14,11 +14,14 @@
     "@puzzle-app/shared": "workspace:*",
     "@puzzle-app/jigsaw-generator": "workspace:*",
     "bullmq": "^5",
+    "drizzle-orm": "^0.38",
     "ioredis": "^5",
-    "sharp": "^0.33",
-    "minio": "^8"
+    "minio": "^8",
+    "pg": "^8",
+    "sharp": "^0.33"
   },
   "devDependencies": {
+    "@types/pg": "^8",
     "tsx": "^4",
     "typescript": "^5"
   }

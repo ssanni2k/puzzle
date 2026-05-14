@@ -26,6 +26,7 @@
     "fastify": "^5",
     "ioredis": "^5",
     "jsonwebtoken": "^9",
+    "minio": "^8",
     "pg": "^8",
     "uuid": "^11"
   },

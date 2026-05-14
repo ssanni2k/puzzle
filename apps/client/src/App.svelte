@@ -4,6 +4,9 @@
   import Navbar from './components/Navbar.svelte';
   import Login from './pages/Login.svelte';
   import Register from './pages/Register.svelte';
+  import Catalog from './pages/Catalog.svelte';
+  import Create from './pages/Create.svelte';
+  import PuzzleDetail from './pages/PuzzleDetail.svelte';
 
   let currentRoute = $state('/');
 
@@ -18,20 +21,40 @@
     currentRoute = window.location.pathname || '/';
     return () => window.removeEventListener('popstate', handlePopState);
   });
+
+  function navigate(path: string) {
+    window.history.pushState({}, '', path);
+    currentRoute = path;
+  }
+
+  const routeMatch = $derived(byPattern(currentRoute));
+
+  function byPattern(path: string) {
+    if (path === '/login') return { page: 'login', id: '' };
+    if (path === '/register') return { page: 'register', id: '' };
+    if (path === '/create') return { page: 'create', id: '' };
+    if (path === '/' || path === '') return { page: 'catalog', id: '' };
+
+    const puzzleMatch = path.match(/^\/puzzle\/([\w-]+)$/);
+    if (puzzleMatch) return { page: 'puzzle', id: puzzleMatch[1] };
+
+    return { page: 'catalog', id: '' };
+  }
 </script>
 
 <Navbar />
 
 <main>
-  {#if currentRoute === '/login'}
+  {#if routeMatch.page === 'login'}
     <Login />
-  {:else if currentRoute === '/register'}
+  {:else if routeMatch.page === 'register'}
     <Register />
+  {:else if routeMatch.page === 'create'}
+    <Create />
+  {:else if routeMatch.page === 'puzzle'}
+    <PuzzleDetail />
   {:else}
-    <div class="home">
-      <h1>Пазлы</h1>
-      <p>Собирайте пазлы онлайн — каталог скоро появится.</p>
-    </div>
+    <Catalog />
   {/if}
 </main>
 
@@ -47,19 +70,5 @@
     max-width: 1200px;
     margin: 0 auto;
     padding: 2rem 1.5rem;
-  }
-
-  .home {
-    text-align: center;
-    padding: 4rem 0;
-  }
-
-  .home h1 {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-  }
-
-  .home p {
-    color: #718096;
   }
 </style>

@@ -78,6 +78,9 @@ importers:
       jsonwebtoken:
         specifier: ^9
         version: 9.0.3
+      minio:
+        specifier: ^8
+        version: 8.0.7
       pg:
         specifier: ^8
         version: 8.20.0
@@ -118,16 +121,25 @@ importers:
       bullmq:
         specifier: ^5
         version: 5.76.8
+      drizzle-orm:
+        specifier: ^0.38
+        version: 0.38.4(@types/pg@8.20.0)(pg@8.20.0)
       ioredis:
         specifier: ^5
         version: 5.10.1
       minio:
         specifier: ^8
         version: 8.0.7
+      pg:
+        specifier: ^8
+        version: 8.20.0
       sharp:
         specifier: ^0.33
         version: 0.33.5
     devDependencies:
+      '@types/pg':
+        specifier: ^8
+        version: 8.20.0
       tsx:
         specifier: ^4
         version: 4.21.0

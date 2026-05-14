@@ -3,20 +3,30 @@
 
   async function handleLogout() {
     await auth.logout();
+    window.history.pushState({}, '', '/');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }
+
+  function navigate(path: string) {
+    window.history.pushState({}, '', path);
+    window.dispatchEvent(new PopStateEvent('popstate'));
   }
 </script>
 
 <header>
   <nav>
-    <a href="/" class="logo">Пазлы</a>
+    <a href="/" class="logo" onclick={() => navigate('/')}>Пазлы</a>
 
     <div class="nav-links">
+      <a href="/" onclick={() => navigate('/')}>Каталог</a>
+
       {#if auth.state.isAuthenticated}
+        <a href="/create" onclick={() => navigate('/create')}>Создать</a>
         <span class="user-name">{auth.state.user?.username}</span>
-        <button on:click={handleLogout}>Выйти</button>
+        <button onclick={handleLogout}>Выйти</button>
       {:else}
-        <a href="/login">Вход</a>
-        <a href="/register">Регистрация</a>
+        <a href="/login" onclick={() => navigate('/login')}>Вход</a>
+        <a href="/register" onclick={() => navigate('/register')}>Регистрация</a>
       {/if}
     </div>
   </nav>
@@ -59,11 +69,10 @@
   a {
     color: #4299e1;
     text-decoration: none;
+    cursor: pointer;
   }
 
-  a:hover {
-    text-decoration: underline;
-  }
+  a:hover { text-decoration: underline; }
 
   button {
     padding: 0.4rem 0.75rem;
@@ -75,8 +84,5 @@
     font-size: 0.875rem;
   }
 
-  button:hover {
-    background: #e53e3e;
-    color: white;
-  }
+  button:hover { background: #e53e3e; color: white; }
 </style>
