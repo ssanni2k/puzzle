@@ -15,6 +15,8 @@
     isPublic: boolean;
     completionsCount: number;
     imageUrl: string;
+    contoursUrl?: string;
+    piecesBaseUrl?: string;
     createdAt: string;
   }
 

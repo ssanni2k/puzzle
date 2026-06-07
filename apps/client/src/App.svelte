@@ -7,6 +7,7 @@
   import Catalog from './pages/Catalog.svelte';
   import Create from './pages/Create.svelte';
   import PuzzleDetail from './pages/PuzzleDetail.svelte';
+  import Play from './pages/Play.svelte';
 
   let currentRoute = $state('/');
 
@@ -35,6 +36,9 @@
     if (path === '/create') return { page: 'create', id: '' };
     if (path === '/' || path === '') return { page: 'catalog', id: '' };
 
+    const playMatch = path.match(/^\/play\/([\w-]+)$/);
+    if (playMatch) return { page: 'play', id: playMatch[1] };
+
     const puzzleMatch = path.match(/^\/puzzle\/([\w-]+)$/);
     if (puzzleMatch) return { page: 'puzzle', id: puzzleMatch[1] };
 
@@ -51,6 +55,8 @@
     <Register />
   {:else if routeMatch.page === 'create'}
     <Create />
+  {:else if routeMatch.page === 'play'}
+    <Play />
   {:else if routeMatch.page === 'puzzle'}
     <PuzzleDetail />
   {:else}
@@ -64,6 +70,11 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: #f7fafc;
     color: #2d3748;
+  }
+
+  :global(.play-page) {
+    max-width: none !important;
+    padding: 0 !important;
   }
 
   main {
