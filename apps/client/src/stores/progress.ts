@@ -85,7 +85,11 @@ function createProgressStore() {
     }
 
     saveToLocalStorage();
-    debouncedSaveToServer();
+    if (allLocked) {
+      saveToServer();
+    } else {
+      debouncedSaveToServer();
+    }
   }
 
   function movePiece(pieceId: string, x: number, y: number, rotation: number) {
@@ -95,6 +99,20 @@ function createProgressStore() {
       ...state.pieces,
       [pieceId]: { x, y, rotation, locked: false },
     };
+    saveToLocalStorage();
+    debouncedSaveToServer();
+  }
+
+  async function resetWithServer(puzzleId: string, isAuthenticated: boolean) {
+    localStorage.removeItem(STORAGE_PREFIX + puzzleId);
+    state = { puzzleId: '', pieces: {}, completed: false };
+    if (isAuthenticated) {
+      try {
+        await api.delete(`/progress/${puzzleId}`);
+      } catch {
+        // ignore
+      }
+    }
   }
 
   function reset(puzzleId: string) {
@@ -167,12 +185,31 @@ function createProgressStore() {
     return Object.keys(state.pieces).length;
   }
 
+  function onRemoteLock(pieceId: string, targetX: number, targetY: number) {
+    if (!state.pieces[pieceId]) return;
+    state.pieces = {
+      ...state.pieces,
+      [pieceId]: { x: targetX, y: targetY, rotation: 0, locked: true },
+    };
+    saveToLocalStorage();
+
+    const allLocked = Object.values(state.pieces).every((p) => p.locked);
+    if (allLocked) {
+      state.completed = true;
+    }
+  }
+
+  function onRemoteComplete() {
+    state.completed = true;
+  }
+
   return {
     get state() { return state; },
     initFromContours,
     lockPiece,
     movePiece,
     reset,
+    resetWithServer,
     load,
     loadFromLocalStorage,
     loadFromServer,
@@ -180,6 +217,8 @@ function createProgressStore() {
     saveToServer,
     getLockedCount,
     getTotalCount,
+    onRemoteLock,
+    onRemoteComplete,
   };
 }
 

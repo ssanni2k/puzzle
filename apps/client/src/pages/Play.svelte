@@ -4,6 +4,7 @@
   import { auth } from '../stores/auth.js';
   import { progressStore } from '../stores/progress.js';
   import { resetZ } from '../lib/dnd.js';
+  import { createProgressWS } from '../lib/ws.js';
   import PuzzleBoard from '../components/PuzzleBoard.svelte';
   import type { PieceData, PuzzleContours } from '@puzzle-app/shared';
 
@@ -32,10 +33,15 @@
 
   let containerEl: HTMLElement | undefined = $state();
   let scale = $state(1);
+  let ws: ReturnType<typeof createProgressWS> | null = null;
 
   onMount(() => {
     puzzleId = window.location.pathname.split('/').pop() ?? '';
     loadPuzzle();
+
+    return () => {
+      ws?.close();
+    };
   });
 
   async function loadPuzzle() {
@@ -108,13 +114,32 @@
     }
 
     completed = Object.values(progressStore.state.pieces).every((p) => p.locked);
+
+    if (auth.state.isAuthenticated) {
+      ws = createProgressWS({
+        puzzleId,
+        onLock: (data) => {
+          progressStore.onRemoteLock(data.pieceId, data.targetX, data.targetY);
+          const allLocked = Object.values(progressStore.state.pieces).every((p) => p.locked);
+          if (allLocked) {
+            completed = true;
+          }
+        },
+        onComplete: () => {
+          completed = true;
+        },
+      });
+    }
   }
 
   function handleLock(pieceId: string, targetX: number, targetY: number) {
     progressStore.lockPiece(pieceId, targetX, targetY);
+    ws?.sendLock(pieceId, targetX, targetY);
+
     const allLocked = Object.values(progressStore.state.pieces).every((p) => p.locked);
     if (allLocked) {
       completed = true;
+      ws?.sendComplete();
     }
   }
 
@@ -123,15 +148,31 @@
     if (existing && !existing.locked) {
       progressStore.movePiece(pieceId, x, y, existing.rotation);
     }
-    progressStore.saveToLocalStorage();
   }
 
-  function handleReset() {
+  async function handleReset() {
     if (!contours) return;
-    progressStore.reset(puzzleId);
+    ws?.close();
+    await progressStore.resetWithServer(puzzleId, auth.state.isAuthenticated);
     progressStore.initFromContours(puzzleId, contours.pieces, contours.width, contours.height);
     resetZ();
     completed = false;
+
+    if (auth.state.isAuthenticated) {
+      ws = createProgressWS({
+        puzzleId,
+        onLock: (data) => {
+          progressStore.onRemoteLock(data.pieceId, data.targetX, data.targetY);
+          const allLocked = Object.values(progressStore.state.pieces).every((p) => p.locked);
+          if (allLocked) {
+            completed = true;
+          }
+        },
+        onComplete: () => {
+          completed = true;
+        },
+      });
+    }
   }
 
   $effect(() => {

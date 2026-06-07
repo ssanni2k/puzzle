@@ -4,6 +4,7 @@ import { puzzleRoutes } from './puzzles.js';
 import { progressRoutes } from './progress.js';
 import { reportRoutes } from './reports.js';
 import { profileRoutes } from './profile.js';
+import { wsProgressRoutes } from './ws-progress.js';
 
 export async function registerRoutes(app: FastifyInstance) {
   app.register(authRoutes, { prefix: '/auth' });
@@ -11,4 +12,5 @@ export async function registerRoutes(app: FastifyInstance) {
   app.register(progressRoutes, { prefix: '/progress' });
   app.register(reportRoutes, { prefix: '/reports' });
   app.register(profileRoutes, { prefix: '/profile' });
+  app.register(wsProgressRoutes, { prefix: '/ws' });
 }
