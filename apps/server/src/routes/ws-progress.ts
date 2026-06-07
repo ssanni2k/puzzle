@@ -1,7 +1,23 @@
 import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
 import { verifyToken, ACCESS_TOKEN_COOKIE } from '../utils/auth.js';
 
 const connections = new Map<string, Set<WebSocket>>();
+
+const wsLockSchema = z.object({
+  type: z.literal('lock'),
+  pieceId: z.string().min(1),
+  targetX: z.number(),
+  targetY: z.number(),
+});
+
+const wsCompleteSchema = z.object({
+  type: z.literal('complete'),
+});
+
+const wsPingSchema = z.object({
+  type: z.literal('ping'),
+});
 
 function getPuzzleConnections(puzzleId: string): Set<WebSocket> {
   let conns = connections.get(puzzleId);
@@ -59,19 +75,29 @@ export const wsProgressRoutes: FastifyPluginAsync = async (app) => {
       try {
         const msg = JSON.parse(raw.toString());
 
-        if (msg.type === 'lock') {
+        if (wsPingSchema.safeParse(msg).success) {
+          socket.send(JSON.stringify({ type: 'pong' }));
+          return;
+        }
+
+        const lockResult = wsLockSchema.safeParse(msg);
+        if (lockResult.success) {
           broadcast(puzzleId, {
             type: 'lock',
-            pieceId: msg.pieceId,
-            targetX: msg.targetX,
-            targetY: msg.targetY,
+            pieceId: lockResult.data.pieceId,
+            targetX: lockResult.data.targetX,
+            targetY: lockResult.data.targetY,
             userId,
           }, socket);
-        } else if (msg.type === 'complete') {
+          return;
+        }
+
+        if (wsCompleteSchema.safeParse(msg).success) {
           broadcast(puzzleId, {
             type: 'complete',
             userId,
           }, socket);
+          return;
         }
       } catch {
         // ignore malformed messages

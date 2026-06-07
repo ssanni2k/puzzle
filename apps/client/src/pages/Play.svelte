@@ -5,6 +5,7 @@
   import { progressStore } from '../stores/progress.js';
   import { resetZ } from '../lib/dnd.js';
   import { createProgressWS } from '../lib/ws.js';
+  import { extractIdFromPath } from '../lib/routing.js';
   import PuzzleBoard from '../components/PuzzleBoard.svelte';
   import type { PieceData, PuzzleContours } from '@puzzle-app/shared';
 
@@ -18,6 +19,13 @@
     imageUrl: string;
     contoursUrl?: string;
     piecesBaseUrl?: string;
+  }
+
+  interface HintHighlight {
+    targetX: number;
+    targetY: number;
+    width: number;
+    height: number;
   }
 
   const PADDING = 200;
@@ -35,12 +43,21 @@
   let scale = $state(1);
   let ws: ReturnType<typeof createProgressWS> | null = null;
 
+  let hintMode = $state(false);
+  let hintHighlight = $state<HintHighlight | null>(null);
+  let showOriginal = $state(false);
+  let originalTimer: ReturnType<typeof setTimeout> | null = null;
+
+  let hintHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+
   onMount(() => {
-    puzzleId = window.location.pathname.split('/').pop() ?? '';
+    puzzleId = extractIdFromPath('/play');
     loadPuzzle();
 
     return () => {
       ws?.close();
+      if (originalTimer) clearTimeout(originalTimer);
+      if (hintHighlightTimer) clearTimeout(hintHighlightTimer);
     };
   });
 
@@ -54,7 +71,12 @@
         return;
       }
       if (puzzle.contoursUrl && puzzle.piecesBaseUrl) {
-        const contoursData = await fetch(puzzle.contoursUrl).then((r) => r.json()) as PuzzleContours;
+        const res = await fetch(puzzle.contoursUrl);
+        if (!res.ok) {
+          error = 'Не удалось загрузить данные пазла';
+          return;
+        }
+        const contoursData = await res.json() as PuzzleContours;
         contours = contoursData;
         piecesBaseUrl = puzzle.piecesBaseUrl;
         await preloadImages(contoursData.pieces, piecesBaseUrl);
@@ -150,6 +172,47 @@
     }
   }
 
+  function handleHintSelect(pieceId: string) {
+    if (!contours) return;
+    hintMode = false;
+
+    const piece = contours.pieces.find((p) => p.id === pieceId);
+    if (!piece) return;
+
+    hintHighlight = {
+      targetX: piece.targetX,
+      targetY: piece.targetY,
+      width: piece.width,
+      height: piece.height,
+    };
+
+    hintHighlightTimer = setTimeout(() => {
+      hintHighlight = null;
+    }, 2500);
+  }
+
+  function handleHintPlace() {
+    hintMode = !hintMode;
+    hintHighlight = null;
+  }
+
+  function handleHintOriginal() {
+    if (originalTimer) {
+      clearTimeout(originalTimer);
+      originalTimer = null;
+    }
+    showOriginal = true;
+    originalTimer = setTimeout(() => {
+      showOriginal = false;
+      originalTimer = null;
+    }, 4000);
+  }
+
+  function cancelHint() {
+    hintMode = false;
+    hintHighlight = null;
+  }
+
   async function handleReset() {
     if (!contours) return;
     ws?.close();
@@ -157,6 +220,8 @@
     progressStore.initFromContours(puzzleId, contours.pieces, contours.width, contours.height);
     resetZ();
     completed = false;
+    hintMode = false;
+    hintHighlight = null;
 
     if (auth.state.isAuthenticated) {
       ws = createProgressWS({
@@ -214,7 +279,16 @@
       <div class="toolbar">
         <a href="/puzzle/{puzzleId}" class="back-btn">← Назад</a>
         <span class="title">{puzzle?.title}</span>
-        <button class="reset-btn" onclick={handleReset}>Сбросить</button>
+        <div class="toolbar-actions">
+          {#if hintMode}
+            <button class="hint-btn active" onclick={cancelHint}>Отмена</button>
+            <span class="hint-hint">Выберите кусочек</span>
+          {:else}
+            <button class="hint-btn" onclick={handleHintPlace}>💡 Место</button>
+            <button class="hint-btn" onclick={handleHintOriginal}>👁 Оригинал</button>
+          {/if}
+          <button class="reset-btn" onclick={handleReset}>Сбросить</button>
+        </div>
       </div>
 
       <PuzzleBoard
@@ -224,8 +298,13 @@
         boardHeight={contours.height}
         pieceStates={progressStore.state.pieces}
         scale={scale}
+        hintMode={hintMode}
+        hintHighlight={hintHighlight}
+        showOriginal={showOriginal}
+        originalImageUrl={puzzle?.imageUrl ?? ''}
         onlock={handleLock}
         onmoveend={handleMoveEnd}
+        onhintselect={handleHintSelect}
       />
     {/if}
   {:else}
@@ -272,12 +351,14 @@
     justify-content: space-between;
     margin-bottom: 1rem;
     padding: 0.5rem 0;
+    gap: 0.75rem;
   }
 
   .back-btn {
     color: #4299e1;
     text-decoration: none;
     font-size: 0.9rem;
+    white-space: nowrap;
   }
 
   .back-btn:hover {
@@ -287,6 +368,42 @@
   .title {
     font-weight: 600;
     font-size: 1.1rem;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .hint-btn {
+    padding: 0.4rem 0.75rem;
+    background: #fefcbf;
+    border: 1px solid #d69e2e;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #744210;
+  }
+
+  .hint-btn:hover {
+    background: #fef9c3;
+  }
+
+  .hint-btn.active {
+    background: #4299e1;
+    color: white;
+    border-color: #4299e1;
+  }
+
+  .hint-hint {
+    font-size: 0.85rem;
+    color: #718096;
+    white-space: nowrap;
   }
 
   .reset-btn {
@@ -364,5 +481,43 @@
 
   .back-link:hover {
     background: #e2e8f0;
+  }
+
+  @media (max-width: 640px) {
+    .toolbar {
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .title {
+      font-size: 0.95rem;
+      order: -1;
+      width: 100%;
+      flex-basis: 100%;
+    }
+
+    .toolbar-actions {
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+
+    .hint-btn, .reset-btn {
+      font-size: 0.8rem;
+      padding: 0.35rem 0.6rem;
+    }
+
+    .hint-hint {
+      font-size: 0.8rem;
+    }
+
+    .completion-card {
+      margin: 1rem;
+      padding: 1.5rem;
+    }
+
+    .completion-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
   }
 </style>

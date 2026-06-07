@@ -22,9 +22,11 @@
   let search = $state('');
   let showMine = $state(false);
   let loading = $state(true);
+  let error = $state('');
 
   async function loadPuzzles() {
     loading = true;
+    error = '';
     try {
       const params = new URLSearchParams({
         page: String(page),
@@ -36,15 +38,18 @@
       puzzles = data.items;
       total = data.total;
     } catch (e) {
-      console.error('Failed to load puzzles:', e);
+      error = e instanceof Error ? e.message : 'Ошибка загрузки';
     } finally {
       loading = false;
     }
   }
 
-  onMount(loadPuzzles);
-
   let searchTimeout: ReturnType<typeof setTimeout>;
+  onMount(() => {
+    loadPuzzles();
+    return () => clearTimeout(searchTimeout);
+  });
+
   function onSearchInput() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
@@ -77,6 +82,8 @@
 
   {#if loading}
     <p class="loading">Загрузка...</p>
+  {:else if error}
+    <p class="error">{error}</p>
   {:else if puzzles.length === 0}
     <p class="empty">Пазлы не найдены</p>
   {:else}
@@ -187,5 +194,36 @@
     text-align: center;
     color: #718096;
     padding: 3rem 0;
+  }
+
+  .error {
+    text-align: center;
+    color: #e53e3e;
+    padding: 3rem 0;
+  }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 1.5rem; }
+
+    .toolbar {
+      flex-wrap: wrap;
+    }
+
+    input {
+      min-width: 0;
+    }
+
+    .grid {
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .card-image {
+      height: 120px;
+    }
+
+    .card-info h3 {
+      font-size: 0.9rem;
+    }
   }
 </style>

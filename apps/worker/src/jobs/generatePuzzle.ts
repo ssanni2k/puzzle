@@ -16,8 +16,24 @@ interface GeneratePuzzleData {
 const IMAGE_WIDTH = 800;
 const IMAGE_HEIGHT = 600;
 
+async function cleanupPieces(piecesDir: string): Promise<void> {
+  try {
+    const objects = minioClient.listObjects(BUCKET_PIECES, `${piecesDir}/`, false);
+    for await (const obj of objects) {
+      if (obj.name) {
+        await minioClient.removeObject(BUCKET_PIECES, obj.name);
+      }
+    }
+  } catch {
+    // ignore cleanup errors
+  }
+}
+
 export async function generatePuzzle(data: GeneratePuzzleData): Promise<void> {
   const { puzzleId, imageKey, gridCols, gridRows } = data;
+
+  const baseKey = imageKey.replace(/\.[^.]+$/, '');
+  const piecesDir = `${baseKey}/pieces`;
 
   try {
     await markStatus(puzzleId, 'processing');
@@ -29,21 +45,33 @@ export async function generatePuzzle(data: GeneratePuzzleData): Promise<void> {
       .jpeg({ quality: 90 })
       .toBuffer();
 
-    await minioClient.putObject(BUCKET_IMAGES, imageKey, processedImage, processedImage.length, {
+    const processedKey = `${baseKey}_processed.jpg`;
+    await minioClient.putObject(BUCKET_IMAGES, processedKey, processedImage, processedImage.length, {
       'Content-Type': 'image/jpeg',
     });
 
-    const pieces: PieceData[] = generatePieces({
-      cols: gridCols,
-      rows: gridRows,
-      width: IMAGE_WIDTH,
-      height: IMAGE_HEIGHT,
-    });
+    let pieces: PieceData[];
+    try {
+      pieces = generatePieces({
+        cols: gridCols,
+        rows: gridRows,
+        width: IMAGE_WIDTH,
+        height: IMAGE_HEIGHT,
+      });
+    } catch (err) {
+      console.error(`Puzzle ${puzzleId} piece generation failed:`, err);
+      await markStatus(puzzleId, 'error');
+      return;
+    }
 
-    const baseKey = imageKey.replace(/\.[^.]+$/, '');
-    const piecesDir = `${baseKey}/pieces`;
+    await cleanupPieces(piecesDir);
 
-    await sliceAndUploadPieces(processedImage, pieces, piecesDir);
+    try {
+      await sliceAndUploadPieces(processedImage, pieces, piecesDir);
+    } catch (err) {
+      await cleanupPieces(piecesDir);
+      throw err;
+    }
 
     const contoursKey = `${baseKey}/contours.json`;
     const contours: PuzzleContours = {
@@ -62,7 +90,7 @@ export async function generatePuzzle(data: GeneratePuzzleData): Promise<void> {
 
     await db
       .update(puzzles)
-      .set({ status: 'ready', contoursKey })
+      .set({ status: 'ready', contoursKey, imageKey: processedKey })
       .where(eq(puzzles.id, puzzleId));
 
     console.log(`Puzzle ${puzzleId} generated: ${pieces.length} pieces`);
@@ -77,13 +105,27 @@ async function sliceAndUploadPieces(
   pieces: PieceData[],
   piecesDir: string,
 ): Promise<void> {
-  for (const piece of pieces) {
-    const pieceBuffer = await slicePiece(sourceBuffer, piece);
-    const pieceKey = `${piecesDir}/${piece.id}.png`;
+  const uploadedKeys: string[] = [];
 
-    await minioClient.putObject(BUCKET_PIECES, pieceKey, pieceBuffer, pieceBuffer.length, {
-      'Content-Type': 'image/png',
-    });
+  try {
+    for (const piece of pieces) {
+      const pieceBuffer = await slicePiece(sourceBuffer, piece);
+      const pieceKey = `${piecesDir}/${piece.id}.png`;
+
+      await minioClient.putObject(BUCKET_PIECES, pieceKey, pieceBuffer, pieceBuffer.length, {
+        'Content-Type': 'image/png',
+      });
+      uploadedKeys.push(pieceKey);
+    }
+  } catch (err) {
+    for (const key of uploadedKeys) {
+      try {
+        await minioClient.removeObject(BUCKET_PIECES, key);
+      } catch {
+        // ignore
+      }
+    }
+    throw err;
   }
 }
 
@@ -93,8 +135,8 @@ async function slicePiece(
 ): Promise<Buffer> {
   const extractLeft = Math.max(0, Math.round(piece.targetX - piece.offsetX));
   const extractTop = Math.max(0, Math.round(piece.targetY - piece.offsetY));
-  const extractWidth = Math.min(Math.round(piece.width), IMAGE_WIDTH - extractLeft);
-  const extractHeight = Math.min(Math.round(piece.height), IMAGE_HEIGHT - extractTop);
+  const extractWidth = Math.max(1, Math.min(Math.round(piece.width), IMAGE_WIDTH - extractLeft));
+  const extractHeight = Math.max(1, Math.min(Math.round(piece.height), IMAGE_HEIGHT - extractTop));
 
   const maskSvg = [
     `<svg width="${extractWidth}" height="${extractHeight}" xmlns="http://www.w3.org/2000/svg">`,

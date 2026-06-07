@@ -12,8 +12,10 @@
     snapTargetX,
     snapTargetY,
     scale,
+    highlighted,
     onlock,
     onmoveend,
+    onhintselect,
   }: {
     piece: PieceData;
     x: number;
@@ -24,10 +26,13 @@
     snapTargetX: number;
     snapTargetY: number;
     scale: number;
+    highlighted: boolean;
     onlock: (pieceId: string, targetX: number, targetY: number) => void;
     onmoveend: (pieceId: string, x: number, y: number) => void;
+    onhintselect?: (pieceId: string) => void;
   } = $props();
 
+  // Captures initial value — synced via $effect when not dragging
   let localX = $state(x);
   let localY = $state(y);
   let localRotation = $state(rotation);
@@ -48,6 +53,10 @@
 
   function handlePointerDown(e: PointerEvent) {
     if (localLocked) return;
+    if (highlighted && onhintselect) {
+      onhintselect(piece.id);
+      return;
+    }
     isDragging = true;
     lastClientX = e.clientX;
     lastClientY = e.clientY;
@@ -101,6 +110,7 @@
   class="piece"
   class:locked={localLocked}
   class:dragging={isDragging}
+  class:hint-selectable={highlighted && !localLocked}
   style="left:{localX}px; top:{localY}px; width:{piece.width}px; height:{piece.height}px; transform:rotate({localRotation}deg); z-index:{zIdx}; transition:{transitionStyle};"
   onpointerdown={handlePointerDown}
   onpointermove={handlePointerMove}
@@ -127,11 +137,25 @@
     filter: brightness(1.05);
   }
 
+  .piece.hint-selectable {
+    cursor: pointer;
+    animation: hint-pulse 1s ease-in-out infinite;
+  }
+
   .piece img {
     width: 100%;
     height: 100%;
     pointer-events: none;
     user-select: none;
     -webkit-user-drag: none;
+  }
+
+  @keyframes hint-pulse {
+    0%, 100% {
+      filter: drop-shadow(0 0 4px rgba(66, 153, 225, 0.4));
+    }
+    50% {
+      filter: drop-shadow(0 0 12px rgba(66, 153, 225, 0.9));
+    }
   }
 </style>

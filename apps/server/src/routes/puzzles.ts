@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
 import { db } from '../db/index.js';
 import { puzzles, progress } from '../db/schema.js';
 import { eq, and, ilike, desc, sql } from 'drizzle-orm';
@@ -7,23 +8,33 @@ import { minioClient, BUCKET_IMAGES, BUCKET_PIECES, getImageUrl, getContoursUrl,
 import { enqueuePuzzleGeneration } from '../services/queue.js';
 import { v4 as uuid } from 'uuid';
 
+const uuidSchema = z.string().uuid();
+
+function escapeLike(str: string): string {
+  return str.replace(/[%_\\]/g, '\\$&');
+}
+
 export const puzzleRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', async (request, reply) => {
     const query = puzzleQuerySchema.parse(request.query);
     const { page, limit, search, mine } = query;
     const offset = (page - 1) * limit;
 
+    const likePattern = search ? `%${escapeLike(search)}%` : undefined;
+
     let conditions;
 
     if (mine && request.user) {
       conditions = and(
         eq(puzzles.userId, request.user.userId),
-        search ? ilike(puzzles.title, `%${search}%`) : undefined,
+        search ? ilike(puzzles.title, likePattern!) : undefined,
       );
+    } else if (mine && !request.user) {
+      return reply.status(401).send({ message: 'Authentication required' });
     } else {
       conditions = and(
         eq(puzzles.isPublic, true),
-        search ? ilike(puzzles.title, `%${search}%`) : undefined,
+        search ? ilike(puzzles.title, likePattern!) : undefined,
       );
     }
 
@@ -66,6 +77,10 @@ export const puzzleRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const parsed = uuidSchema.safeParse(id);
+    if (!parsed.success) {
+      return reply.status(400).send({ message: 'Invalid puzzle ID' });
+    }
 
     const [puzzle] = await db.select().from(puzzles).where(eq(puzzles.id, id)).limit(1);
 
@@ -154,6 +169,11 @@ export const puzzleRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const { id } = request.params as { id: string };
+    const idParsed = uuidSchema.safeParse(id);
+    if (!idParsed.success) {
+      return reply.status(400).send({ message: 'Invalid puzzle ID' });
+    }
+
     const body = updatePuzzleSchema.parse(request.body);
 
     const [puzzle] = await db.select().from(puzzles).where(eq(puzzles.id, id)).limit(1);
@@ -184,6 +204,10 @@ export const puzzleRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const { id } = request.params as { id: string };
+    const idParsed = uuidSchema.safeParse(id);
+    if (!idParsed.success) {
+      return reply.status(400).send({ message: 'Invalid puzzle ID' });
+    }
 
     const [puzzle] = await db.select().from(puzzles).where(eq(puzzles.id, id)).limit(1);
 

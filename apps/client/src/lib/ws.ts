@@ -12,6 +12,11 @@ interface ProgressWSOptions {
   onComplete?: () => void;
 }
 
+const MAX_RETRIES = 20;
+const BASE_DELAY = 1000;
+const MAX_DELAY = 30000;
+const HEARTBEAT_INTERVAL = 30000;
+
 function getWsBase(): string {
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
@@ -22,7 +27,41 @@ export function createProgressWS(options: ProgressWSOptions) {
   const { puzzleId, onLock, onComplete } = options;
   let ws: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   let disposed = false;
+  let retryCount = 0;
+  let messageQueue: WsMessage[] = [];
+
+  function scheduleReconnect() {
+    if (disposed) return;
+    const delay = Math.min(BASE_DELAY * Math.pow(2, retryCount), MAX_DELAY);
+    retryCount++;
+    reconnectTimer = setTimeout(connect, delay);
+  }
+
+  function startHeartbeat() {
+    stopHeartbeat();
+    heartbeatTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, HEARTBEAT_INTERVAL);
+  }
+
+  function stopHeartbeat() {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  }
+
+  function flushQueue() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    while (messageQueue.length > 0) {
+      const msg = messageQueue.shift()!;
+      ws.send(JSON.stringify(msg));
+    }
+  }
 
   function connect() {
     if (disposed) return;
@@ -30,10 +69,13 @@ export function createProgressWS(options: ProgressWSOptions) {
     ws = new WebSocket(url);
 
     ws.onopen = () => {
+      retryCount = 0;
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
       }
+      startHeartbeat();
+      flushQueue();
     };
 
     ws.onmessage = (event) => {
@@ -50,8 +92,10 @@ export function createProgressWS(options: ProgressWSOptions) {
     };
 
     ws.onclose = () => {
+      stopHeartbeat();
       if (disposed) return;
-      reconnectTimer = setTimeout(connect, 3000);
+      if (retryCount >= MAX_RETRIES) return;
+      scheduleReconnect();
     };
 
     ws.onerror = () => {
@@ -62,6 +106,8 @@ export function createProgressWS(options: ProgressWSOptions) {
   function send(msg: WsMessage) {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(msg));
+    } else {
+      messageQueue.push(msg);
     }
   }
 
@@ -75,10 +121,12 @@ export function createProgressWS(options: ProgressWSOptions) {
 
   function close() {
     disposed = true;
+    stopHeartbeat();
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
+    messageQueue = [];
     ws?.close();
     ws = null;
   }

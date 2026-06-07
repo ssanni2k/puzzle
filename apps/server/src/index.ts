@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import websocket from '@fastify/websocket';
 import multipart from '@fastify/multipart';
+import { ZodError } from 'zod';
 import { db } from './db/index.js';
 import { registerRoutes } from './routes/index.js';
 import { authPlugin } from './plugins/auth.js';
@@ -13,6 +14,20 @@ const HOST = process.env.HOST ?? '0.0.0.0';
 
 async function main() {
   const app = Fastify({ logger: true });
+
+  app.setErrorHandler((error: Error, request, reply) => {
+    if (error instanceof ZodError) {
+      return reply.status(400).send({
+        message: 'Validation error',
+        issues: error.issues,
+      });
+    }
+    app.log.error(error);
+    const statusCode = 'statusCode' in error ? (error as { statusCode: number }).statusCode : 500;
+    reply.status(statusCode).send({
+      message: error.message || 'Internal Server Error',
+    });
+  });
 
   await app.register(cors, {
     origin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173',

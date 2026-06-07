@@ -6,6 +6,7 @@
   let gridCols = $state(4);
   let gridRows = $state(4);
   let file = $state<File | null>(null);
+  let fileInputEl: HTMLInputElement | undefined = $state();
   let error = $state('');
   let loading = $state(false);
   let success = $state(false);
@@ -38,6 +39,7 @@
       gridCols = 4;
       gridRows = 4;
       file = null;
+      if (fileInputEl) fileInputEl.value = '';
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : 'Upload failed';
     } finally {
@@ -80,7 +82,7 @@
 
       <label>
         Изображение (JPG/PNG, до 10 МБ)
-        <input type="file" accept="image/jpeg,image/png" onchange={onFileChange} required />
+        <input type="file" accept="image/jpeg,image/png" onchange={onFileChange} required bind:this={fileInputEl} />
       </label>
 
       <button type="submit" disabled={loading}>

@@ -8,6 +8,7 @@
   import Create from './pages/Create.svelte';
   import PuzzleDetail from './pages/PuzzleDetail.svelte';
   import Play from './pages/Play.svelte';
+  import Profile from './pages/Profile.svelte';
 
   let currentRoute = $state('/');
 
@@ -34,6 +35,7 @@
     if (path === '/login') return { page: 'login', id: '' };
     if (path === '/register') return { page: 'register', id: '' };
     if (path === '/create') return { page: 'create', id: '' };
+    if (path === '/profile') return { page: 'profile', id: '' };
     if (path === '/' || path === '') return { page: 'catalog', id: '' };
 
     const playMatch = path.match(/^\/play\/([\w-]+)$/);
@@ -55,6 +57,8 @@
     <Register />
   {:else if routeMatch.page === 'create'}
     <Create />
+  {:else if routeMatch.page === 'profile'}
+    <Profile />
   {:else if routeMatch.page === 'play'}
     <Play />
   {:else if routeMatch.page === 'puzzle'}
@@ -81,5 +85,11 @@
     max-width: 1200px;
     margin: 0 auto;
     padding: 2rem 1.5rem;
+  }
+
+  @media (max-width: 640px) {
+    main {
+      padding: 1rem 0.75rem;
+    }
   }
 </style>

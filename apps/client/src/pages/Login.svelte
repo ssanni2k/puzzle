@@ -12,6 +12,8 @@
     loading = true;
     try {
       await auth.login(login, password);
+      window.history.pushState({}, '', '/');
+      window.dispatchEvent(new PopStateEvent('popstate'));
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : 'Login failed';
     } finally {

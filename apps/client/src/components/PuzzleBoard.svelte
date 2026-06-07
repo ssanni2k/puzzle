@@ -2,6 +2,13 @@
   import type { PieceData } from '@puzzle-app/shared';
   import DraggablePiece from './DraggablePiece.svelte';
 
+  interface HintHighlight {
+    targetX: number;
+    targetY: number;
+    width: number;
+    height: number;
+  }
+
   interface Props {
     pieces: PieceData[];
     piecesBaseUrl: string;
@@ -9,8 +16,13 @@
     boardHeight?: number;
     pieceStates: Record<string, { x: number; y: number; rotation: number; locked: boolean }>;
     scale: number;
+    hintMode: boolean;
+    hintHighlight: HintHighlight | null;
+    showOriginal: boolean;
+    originalImageUrl: string;
     onlock: (pieceId: string, x: number, y: number) => void;
     onmoveend: (pieceId: string, x: number, y: number) => void;
+    onhintselect?: (pieceId: string) => void;
   }
 
   let {
@@ -20,8 +32,13 @@
     boardHeight = 600,
     pieceStates,
     scale,
+    hintMode,
+    hintHighlight,
+    showOriginal,
+    originalImageUrl,
     onlock,
     onmoveend,
+    onhintselect,
   }: Props = $props();
 
   const padding = 200;
@@ -71,6 +88,22 @@
       >
       </div>
 
+      {#if showOriginal}
+        <img
+          class="original-overlay"
+          src={originalImageUrl}
+          alt=""
+          style="left:{padding}px; top:{padding}px; width:{boardWidth}px; height:{boardHeight}px;"
+        />
+      {/if}
+
+      {#if hintHighlight}
+        <div
+          class="hint-target"
+          style="left:{hintHighlight.targetX + padding}px; top:{hintHighlight.targetY + padding}px; width:{hintHighlight.width}px; height:{hintHighlight.height}px;"
+        ></div>
+      {/if}
+
       {#each pieces as piece (piece.id)}
         <DraggablePiece
           piece={piece}
@@ -82,8 +115,10 @@
           snapTargetX={piece.targetX + padding}
           snapTargetY={piece.targetY + padding}
           scale={scale}
+          highlighted={hintMode && !getPieceLocked(piece)}
           onlock={onlock}
           onmoveend={onmoveend}
+          onhintselect={onhintselect}
         />
       {/each}
     </div>
@@ -120,5 +155,27 @@
     border: 2px dashed #a0aec0;
     border-radius: 4px;
     background: rgba(255, 255, 255, 0.3);
+  }
+
+  .original-overlay {
+    position: absolute;
+    opacity: 0.5;
+    pointer-events: none;
+    border-radius: 4px;
+    transition: opacity 0.5s ease;
+  }
+
+  .hint-target {
+    position: absolute;
+    border: 3px solid #4299e1;
+    border-radius: 4px;
+    background: rgba(66, 153, 225, 0.15);
+    pointer-events: none;
+    animation: hint-blink 0.6s ease-in-out 4;
+  }
+
+  @keyframes hint-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
   }
 </style>

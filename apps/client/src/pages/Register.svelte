@@ -13,6 +13,8 @@
     loading = true;
     try {
       await auth.register(username, email, password);
+      window.history.pushState({}, '', '/');
+      window.dispatchEvent(new PopStateEvent('popstate'));
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : 'Registration failed';
     } finally {

@@ -35,7 +35,11 @@ function createAuthStore() {
   }
 
   async function logout() {
-    await api.post('/auth/logout', {});
+    try {
+      await api.post('/auth/logout', {});
+    } catch {
+      // ignore logout errors — clear local state regardless
+    }
     state = { isAuthenticated: false, user: null, loading: false };
   }
 

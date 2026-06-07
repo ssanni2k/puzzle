@@ -85,11 +85,11 @@ function createProgressStore() {
     }
 
     saveToLocalStorage();
-    if (allLocked) {
-      saveToServer();
-    } else {
-      debouncedSaveToServer();
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
     }
+    saveToServer();
   }
 
   function movePiece(pieceId: string, x: number, y: number, rotation: number) {
@@ -199,10 +199,6 @@ function createProgressStore() {
     }
   }
 
-  function onRemoteComplete() {
-    state.completed = true;
-  }
-
   return {
     get state() { return state; },
     initFromContours,
@@ -218,7 +214,6 @@ function createProgressStore() {
     getLockedCount,
     getTotalCount,
     onRemoteLock,
-    onRemoteComplete,
   };
 }
 

@@ -1,8 +1,11 @@
 import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
 import { db } from '../db/index.js';
-import { progress } from '../db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { progress, puzzles } from '../db/schema.js';
+import { eq, and, sql } from 'drizzle-orm';
 import { saveProgressSchema } from '@puzzle-app/shared';
+
+const uuidSchema = z.string().uuid();
 
 export const progressRoutes: FastifyPluginAsync = async (app) => {
   app.get('/:puzzleId', async (request, reply) => {
@@ -11,6 +14,10 @@ export const progressRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const { puzzleId } = request.params as { puzzleId: string };
+    const parsed = uuidSchema.safeParse(puzzleId);
+    if (!parsed.success) {
+      return reply.status(400).send({ message: 'Invalid puzzle ID' });
+    }
 
     const [entry] = await db
       .select()
@@ -31,10 +38,18 @@ export const progressRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const { puzzleId } = request.params as { puzzleId: string };
+    const parsed = uuidSchema.safeParse(puzzleId);
+    if (!parsed.success) {
+      return reply.status(400).send({ message: 'Invalid puzzle ID' });
+    }
+
     const body = saveProgressSchema.parse(request.body);
 
     const [existing] = await db
-      .select()
+      .select({
+        id: progress.id,
+        completed: progress.completed,
+      })
       .from(progress)
       .where(and(eq(progress.userId, request.user.userId), eq(progress.puzzleId, puzzleId)))
       .limit(1);
@@ -50,6 +65,13 @@ export const progressRoutes: FastifyPluginAsync = async (app) => {
         .where(eq(progress.id, existing.id))
         .returning();
 
+      if (body.completed && !existing.completed) {
+        await db
+          .update(puzzles)
+          .set({ completionsCount: sql`${puzzles.completionsCount} + 1` })
+          .where(eq(puzzles.id, puzzleId));
+      }
+
       return updated;
     }
 
@@ -63,6 +85,13 @@ export const progressRoutes: FastifyPluginAsync = async (app) => {
       })
       .returning();
 
+    if (body.completed) {
+      await db
+        .update(puzzles)
+        .set({ completionsCount: sql`${puzzles.completionsCount} + 1` })
+        .where(eq(puzzles.id, puzzleId));
+    }
+
     return reply.status(201).send(created);
   });
 
@@ -72,6 +101,10 @@ export const progressRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const { puzzleId } = request.params as { puzzleId: string };
+    const parsed = uuidSchema.safeParse(puzzleId);
+    if (!parsed.success) {
+      return reply.status(400).send({ message: 'Invalid puzzle ID' });
+    }
 
     await db
       .delete(progress)
