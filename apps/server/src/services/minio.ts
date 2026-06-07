@@ -45,6 +45,11 @@ export function getImageUrl(key: string): string {
   return `http://${ENDPOINT}:${PORT}/${BUCKET_IMAGES}/${key}`;
 }
 
-export function getPieceUrl(key: string): string {
-  return `http://${ENDPOINT}:${PORT}/${BUCKET_PIECES}/${key}`;
+export function getContoursUrl(contoursKey: string): string {
+  return `http://${ENDPOINT}:${PORT}/${BUCKET_PIECES}/${contoursKey}`;
+}
+
+export function getPiecesBaseUrl(contoursKey: string): string {
+  const basePath = contoursKey.replace('/contours.json', '/pieces');
+  return `http://${ENDPOINT}:${PORT}/${BUCKET_PIECES}/${basePath}`;
 }

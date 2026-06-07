@@ -3,7 +3,7 @@ import { db } from '../db/index.js';
 import { puzzles, progress } from '../db/schema.js';
 import { eq, and, ilike, desc, sql } from 'drizzle-orm';
 import { createPuzzleSchema, updatePuzzleSchema, puzzleQuerySchema } from '@puzzle-app/shared';
-import { minioClient, BUCKET_IMAGES, getImageUrl } from '../services/minio.js';
+import { minioClient, BUCKET_IMAGES, BUCKET_PIECES, getImageUrl, getContoursUrl, getPiecesBaseUrl } from '../services/minio.js';
 import { enqueuePuzzleGeneration } from '../services/queue.js';
 import { v4 as uuid } from 'uuid';
 
@@ -77,10 +77,17 @@ export const puzzleRoutes: FastifyPluginAsync = async (app) => {
       return reply.status(403).send({ message: 'Access denied' });
     }
 
-    return {
+    const response: Record<string, unknown> = {
       ...puzzle,
       imageUrl: getImageUrl(puzzle.imageKey),
     };
+
+    if (puzzle.status === 'ready' && puzzle.contoursKey) {
+      response.contoursUrl = getContoursUrl(puzzle.contoursKey);
+      response.piecesBaseUrl = getPiecesBaseUrl(puzzle.contoursKey);
+    }
+
+    return response;
   });
 
   app.post('/', async (request, reply) => {
@@ -194,6 +201,25 @@ export const puzzleRoutes: FastifyPluginAsync = async (app) => {
       await minioClient.removeObject(BUCKET_IMAGES, puzzle.imageKey);
     } catch {
       // ignore if file doesn't exist
+    }
+
+    if (puzzle.contoursKey) {
+      const baseKey = puzzle.contoursKey.replace('/contours.json', '');
+      try {
+        await minioClient.removeObject(BUCKET_PIECES, puzzle.contoursKey);
+      } catch {
+        // ignore
+      }
+      try {
+        const objects = minioClient.listObjects(BUCKET_PIECES, `${baseKey}/pieces/`, false);
+        for await (const obj of objects) {
+          if (obj.name) {
+            await minioClient.removeObject(BUCKET_PIECES, obj.name);
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
 
     await db.delete(puzzles).where(eq(puzzles.id, id));
